@@ -218,7 +218,7 @@ export const Register = ({ onSwitchToLogin }) => {
           {/* ⭐ CAPTCHA */}
           <div className="mb-3 d-flex justify-content-center">
             <ReCAPTCHA
-              sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+              sitekey={process.env.REACT_APP_RECAPTCHA_SITE_KEY}
               onChange={handleCaptchaChange}
               onExpired={handleCaptchaExpired}
             />
