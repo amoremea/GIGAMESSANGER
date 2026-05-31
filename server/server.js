@@ -22,7 +22,6 @@ const friendRoutes = require('./routes/friendRoutes');
 
 const app = express();
 const server = http.createServer(app);
-
 const io = initSocket(server);
 setupSocketHandlers(io);
 
@@ -57,10 +56,12 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-connectDB();
+// Подключаемся к БД только если не в тестовом режиме
+if (process.env.NODE_ENV !== 'test') {
+  connectDB();
+}
 
-// ⭐ ТОЛЬКО КРИТИЧЕСКИЕ ЛОГИ (можно закомментировать если не нужно)
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   app.use((req, res, next) => {
     console.log(`📡 ${req.method} ${req.url}`);
     next();
@@ -81,7 +82,18 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+// server.js - конец файла
+let serverInstance = null;
+
+// Запускаем сервер всегда, кроме случаев, когда мы в тестах И не хотим запускать
+// Для WebSocket тестов нам нужен работающий сервер
+const shouldSkipServerStart = process.env.NODE_ENV === 'test' && !process.env.START_SERVER;
+
+if (!shouldSkipServerStart) {
+  const PORT = process.env.PORT || 5000;
+  serverInstance = server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}
+
+module.exports = { app, server, serverInstance };

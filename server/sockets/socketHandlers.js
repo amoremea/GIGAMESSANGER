@@ -1,3 +1,4 @@
+// socketHandlers.js - ИСПРАВЛЕННАЯ ВЕРСИЯ (убрано дублирование)
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Message = require('../models/Message');
@@ -56,6 +57,25 @@ const setupSocketHandlers = (io) => {
           return;
         }
 
+        // ⭐ ПРОВЕРЯЕМ, ЧТО ПОЛЬЗОВАТЕЛЬ УЧАСТНИК ЧАТА (переименовано в chatData)
+        const chatData = await Chat.findById(chatId);
+        if (!chatData) {
+          socket.emit('error', { message: 'Chat not found', code: 'CHAT_NOT_FOUND' });
+          return;
+        }
+        
+        const isParticipant = chatData.participants.some(
+          p => p.toString() === socket.userId
+        );
+        
+        if (!isParticipant) {
+          socket.emit('error', { 
+            message: 'You are not a participant of this chat', 
+            code: 'NOT_PARTICIPANT' 
+          });
+          return;
+        }
+
         const message = new Message({
           chatId,
           sender: socket.userId,
@@ -80,25 +100,26 @@ const setupSocketHandlers = (io) => {
           }
         });
 
-        const chat = await Chat.findById(chatId);
-        if (chat) {
-          if (!chat.unreadCount) {
-            chat.unreadCount = new Map();
+        // ⭐ Переименовано в chatForUnread, чтобы не конфликтовать
+        const chatForUnread = await Chat.findById(chatId);
+        if (chatForUnread) {
+          if (!chatForUnread.unreadCount) {
+            chatForUnread.unreadCount = new Map();
           }
           
-          chat.participants.forEach(participantId => {
+          chatForUnread.participants.forEach(participantId => {
             const participantIdStr = participantId.toString();
             if (participantIdStr !== socket.userId) {
-              const currentCount = chat.unreadCount.get(participantIdStr) || 0;
-              chat.unreadCount.set(participantIdStr, currentCount + 1);
+              const currentCount = chatForUnread.unreadCount.get(participantIdStr) || 0;
+              chatForUnread.unreadCount.set(participantIdStr, currentCount + 1);
             } else {
-              chat.unreadCount.set(participantIdStr, 0);
+              chatForUnread.unreadCount.set(participantIdStr, 0);
             }
           });
           
-          await chat.save();
+          await chatForUnread.save();
           
-          for (const participantId of chat.participants) {
+          for (const participantId of chatForUnread.participants) {
             const updatedChat = await Chat.findById(chatId)
               .populate('participants', 'username displayName avatarUrl isOnline')
               .populate('lastMessage.sender', 'username displayName avatarUrl')
@@ -110,6 +131,7 @@ const setupSocketHandlers = (io) => {
         io.to(chatId).emit('new_message', populatedMessage);
 
       } catch (err) {
+        console.error('Send message error:', err);
         socket.emit('error', { message: 'Failed to send message' });
       }
     });
@@ -117,6 +139,15 @@ const setupSocketHandlers = (io) => {
     socket.on('send_friend_request', async (data) => {
       try {
         const { targetUserId } = data;
+        
+        const targetUser = await User.findById(targetUserId);
+        if (!targetUser) {
+          socket.emit('error', { 
+            message: 'User not found', 
+            code: 'USER_NOT_FOUND' 
+          });
+          return;
+        }
         
         const sender = await User.findById(socket.userId).select('username displayName avatarUrl');
         
@@ -137,6 +168,7 @@ const setupSocketHandlers = (io) => {
         socket.emit('friend_request_sent', { success: true });
         
       } catch (err) {
+        console.error('Send friend request error:', err);
         socket.emit('error', { message: 'Failed to send friend request' });
       }
     });

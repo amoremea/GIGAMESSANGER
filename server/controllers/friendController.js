@@ -1,9 +1,9 @@
 // controllers/friendController.js
+const mongoose = require('mongoose'); // ⭐ ДОБАВЬТЕ ЭТУ СТРОКУ В НАЧАЛО ФАЙЛА
 const User = require('../models/User');
 
 const getFriends = async (req, res) => {
   try {
-    // ⭐ Проверяем наличие userId
     if (!req.userId) {
       console.error('❌ getFriends: req.userId is null!');
       return res.status(401).json({ error: 'Пользователь не авторизован' });
@@ -16,7 +16,6 @@ const getFriends = async (req, res) => {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
     
-    // ⭐ Защита от null friends
     res.json(user.friends || []);
   } catch (err) {
     console.error('❌ Ошибка getFriends:', err);
@@ -26,7 +25,6 @@ const getFriends = async (req, res) => {
 
 const getFriendRequests = async (req, res) => {
   try {
-    // ⭐ Проверяем наличие userId
     if (!req.userId) {
       console.error('❌ getFriendRequests: req.userId is null!');
       return res.status(401).json({ error: 'Пользователь не авторизован' });
@@ -39,7 +37,6 @@ const getFriendRequests = async (req, res) => {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
     
-    // ⭐ Защита от null friendRequests
     res.json(user.friendRequests || []);
   } catch (err) {
     console.error('❌ Ошибка getFriendRequests:', err);
@@ -47,15 +44,25 @@ const getFriendRequests = async (req, res) => {
   }
 };
 
-// controllers/friendController.js - sendFriendRequest
-
 const sendFriendRequest = async (req, res) => {
   try {
     if (!req.userId) {
       return res.status(401).json({ error: 'Пользователь не авторизован' });
     }
     
-    const targetUser = await User.findById(req.params.id);
+    const targetUserId = req.params.id;
+    
+    // ⭐ ПРОВЕРКА НА НЕВАЛИДНЫЙ ID
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ error: 'Невалидный ID пользователя' });
+    }
+    
+    // ⭐⭐⭐ ПРОВЕРКА: НЕЛЬЗЯ ОТПРАВИТЬ ЗАЯВКУ САМОМУ СЕБЕ ⭐⭐⭐
+    if (targetUserId === req.userId) {
+      return res.status(400).json({ error: 'Нельзя отправить заявку самому себе' });
+    }
+    
+    const targetUser = await User.findById(targetUserId);
     if (!targetUser) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
@@ -74,7 +81,6 @@ const sendFriendRequest = async (req, res) => {
     
     const sender = await User.findById(req.userId).select('username displayName avatarUrl');
     
-    // Отправляем уведомление через сокет
     const io = req.app.get('io');
     if (io) {
       console.log(`📨 Отправляем заявку в комнату user:${targetUser._id}`);
@@ -88,7 +94,7 @@ const sendFriendRequest = async (req, res) => {
     
     res.json({ message: 'Заявка отправлена', user: sender });
   } catch (err) {
-    console.error(err);
+    console.error('Ошибка отправки заявки:', err);
     res.status(500).json({ error: 'Ошибка отправки заявки' });
   }
 };
@@ -101,12 +107,17 @@ const acceptFriendRequest = async (req, res) => {
       return res.status(401).json({ error: 'Пользователь не авторизован' });
     }
     
+    const newFriendId = req.params.id;
+    
+    // ⭐ ПРОВЕРКА НА НЕВАЛИДНЫЙ ID
+    if (!mongoose.Types.ObjectId.isValid(newFriendId)) {
+      return res.status(400).json({ error: 'Невалидный ID пользователя' });
+    }
+    
     const me = await User.findById(req.userId);
     if (!me) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
-    
-    const newFriendId = req.params.id;
 
     if (!me.friendRequests || !me.friendRequests.includes(newFriendId)) {
       return res.status(400).json({ error: 'Заявка не найдена' });
@@ -152,13 +163,20 @@ const declineFriendRequest = async (req, res) => {
       return res.status(401).json({ error: 'Пользователь не авторизован' });
     }
     
+    const friendId = req.params.id;
+    
+    // ⭐ ПРОВЕРКА НА НЕВАЛИДНЫЙ ID
+    if (!mongoose.Types.ObjectId.isValid(friendId)) {
+      return res.status(400).json({ error: 'Невалидный ID пользователя' });
+    }
+    
     const me = await User.findById(req.userId);
     if (!me) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
     
     if (!me.friendRequests) me.friendRequests = [];
-    me.friendRequests = me.friendRequests.filter(id => id.toString() !== req.params.id);
+    me.friendRequests = me.friendRequests.filter(id => id.toString() !== friendId);
     await me.save();
     
     const updatedMe = await User.findById(req.userId)
@@ -180,7 +198,14 @@ const cancelFriendRequest = async (req, res) => {
       return res.status(401).json({ error: 'Пользователь не авторизован' });
     }
     
-    const targetUser = await User.findById(req.params.id);
+    const targetId = req.params.id;
+    
+    // ⭐ ПРОВЕРКА НА НЕВАЛИДНЫЙ ID
+    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+      return res.status(400).json({ error: 'Невалидный ID пользователя' });
+    }
+    
+    const targetUser = await User.findById(targetId);
     if (!targetUser) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
@@ -205,6 +230,11 @@ const removeFriend = async (req, res) => {
     
     if (!friendId) {
       return res.status(400).json({ error: 'ID друга не указан' });
+    }
+    
+    // ⭐ ПРОВЕРКА НА НЕВАЛИДНЫЙ ID
+    if (!mongoose.Types.ObjectId.isValid(friendId)) {
+      return res.status(400).json({ error: 'Невалидный ID друга' });
     }
     
     const currentUser = await User.findByIdAndUpdate(

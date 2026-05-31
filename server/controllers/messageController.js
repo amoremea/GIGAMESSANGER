@@ -1,11 +1,37 @@
+// controllers/messageController.js
+const mongoose = require('mongoose');
 const Message = require('../models/Message');
-const Chat = require('../models/Chat'); // ⭐ ДОБАВЬТЕ ЭТУ СТРОКУ
+const Chat = require('../models/Chat');
 
 const getMessages = async (req, res) => {
   try {
     const { chatId } = req.query;
 
-    // Теперь мы просто всегда берем данные из основной базы MongoDB
+    // Проверяем валидность ID
+    if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
+      return res.status(400).json({ error: 'Invalid chat ID format' });
+    }
+
+    // Проверяем, что пользователь участник чата
+    const chat = await Chat.findById(chatId);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+    
+    // ⭐ ЗАЩИТА ОТ null/undefined participants
+    const participants = chat.participants || [];
+    
+    const isParticipant = participants.some(
+      p => p && p.toString() === req.userId
+    );
+    
+    if (!isParticipant) {
+      return res.status(403).json({ 
+        error: 'You are not a participant of this chat',
+        code: 'NOT_PARTICIPANT'
+      });
+    }
+
     const messages = await Message.find({ chatId, deleted: false })
       .populate('sender', 'username avatarUrl')
       .sort({ createdAt: 1 });
@@ -20,26 +46,20 @@ const getMessages = async (req, res) => {
 const deleteMessage = async (req, res) => {
   try {
     await Message.findByIdAndUpdate(req.params.id, { deleted: true });
-    
-    // Если в будущем захотите удалять сообщение из кэша, 
-    // здесь раньше тоже был бы вызов Redis, но сейчас он не нужен.
-    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Ошибка при удалении' });
   }
 };
 
-// В файле controllers/messageController.js
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Файл не загружен или формат не поддерживается' });
     }
 
-    // Возвращаем фронтенду прямую ссылку на Cloudinary
     res.json({ 
-      fileUrl: req.file.path, // Прямая ссылка типа https://res.cloudinary.com/...
+      fileUrl: req.file.path,
       fileName: req.file.originalname 
     });
   } catch (err) {
@@ -47,7 +67,6 @@ const uploadFile = async (req, res) => {
   }
 };
 
-// ⭐ ДОБАВЬТЕ ЭТУ ФУНКЦИЮ
 const markAsRead = async (req, res) => {
   try {
     const { chatId } = req.body;
@@ -61,11 +80,24 @@ const markAsRead = async (req, res) => {
       return res.status(404).json({ error: 'Chat not found' });
     }
     
-    // Обнуляем счетчик для текущего пользователя
-    if (!chat.unreadCount) {
-      chat.unreadCount = {};
+    // ⭐ ЗАЩИТА ОТ null/undefined participants
+    const participants = chat.participants || [];
+    
+    const isParticipant = participants.some(
+      p => p && p.toString() === req.userId
+    );
+    
+    if (!isParticipant) {
+      return res.status(403).json({ 
+        error: 'Вы не являетесь участником этого чата',
+        code: 'NOT_PARTICIPANT'
+      });
     }
-    chat.unreadCount[req.userId] = 0;
+    
+    if (!chat.unreadCount) {
+      chat.unreadCount = new Map();
+    }
+    chat.unreadCount.set(req.userId, 0);
     
     await chat.save();
     
@@ -81,5 +113,5 @@ module.exports = {
   getMessages,
   deleteMessage,
   uploadFile,
-  markAsRead // ⭐ ДОБАВЬТЕ ЭТУ СТРОКУ
+  markAsRead
 };

@@ -1,4 +1,4 @@
-// middleware/validateRegistration.js - НОВЫЙ ФАЙЛ
+// middleware/validateRegistration.js
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d).+$/;
 
@@ -6,9 +6,9 @@ const validateRegistration = (req, res, next) => {
   const { username, email, password, confirmPassword } = req.body;
   const errors = [];
 
-  // Валидация username
-  if (!username || username.trim().length < 2 || username.trim().length > 32) {
-    errors.push({ field: 'username', message: 'Имя пользователя должно быть от 2 до 32 символов' });
+  // Валидация username - ИСПРАВЛЕНО
+  if (!username || username.trim().length < 3 || username.trim().length > 32) {  // минимум 3 символа
+    errors.push({ field: 'username', message: 'Имя пользователя должно быть от 3 до 32 символов' });
   }
 
   // Валидация email

@@ -10,6 +10,28 @@ const isValidEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).toLowerCase());
 };
 
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+// В контроллерах, где используются ID из запроса
+const getProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // ⭐ ПРОВЕРЯЕМ VALID OBJECT ID
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+    
+    const user = await User.findById(id).select('-passwordHash -verificationCode');
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+};
+
 const register = async (req, res) => {
   try {
     const { username, email, password, confirmPassword } = req.body;

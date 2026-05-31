@@ -10,37 +10,29 @@ const auth = async (req, res, next) => {
       : authHeader;
 
     if (!token) {
+      console.log('❌ Auth: No token provided for', req.method, req.url);
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     if (!decoded || !decoded.userId) {
+      console.log('❌ Auth: Invalid token for', req.method, req.url);
       return res.status(401).json({ error: 'Invalid token' });
     }
     
     const user = await User.findById(decoded.userId).select('-passwordHash -verificationCode');
     
     if (!user) {
+      console.log('❌ Auth: User not found for id:', decoded.userId);
       return res.status(401).json({ error: 'User no longer exists' });
-    }
-    
-    const currentTime = Math.floor(Date.now() / 1000);
-    const timeUntilExpiry = decoded.exp - currentTime;
-    
-    if (timeUntilExpiry < 1800) {
-      const newToken = jwt.sign(
-        { userId: user._id, username: user.username },
-        process.env.JWT_SECRET,
-        { expiresIn: '2h' }
-      );
-      res.setHeader('X-Refresh-Token', newToken);
     }
     
     req.userId = decoded.userId;
     req.user = user;
     next();
   } catch (err) {
+    console.log('❌ Auth error:', err.message);
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
     }

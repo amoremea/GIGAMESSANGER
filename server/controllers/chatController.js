@@ -39,6 +39,14 @@ exports.createChat = async (req, res) => {
   try {
     const { participants, isGroup, name } = req.body;
     
+    // ⭐ ПРОВЕРКА НА ПУСТОЙ МАССИВ ДЛЯ ГРУППЫ
+    if (isGroup && (!participants || participants.length === 0)) {
+      return res.status(400).json({ 
+        error: 'Для создания группы нужно указать хотя бы одного участника',
+        code: 'EMPTY_PARTICIPANTS'
+      });
+    }
+    
     const currentUser = await User.findById(req.userId).populate('friends');
     
     if (isGroup && participants && participants.length > 0) {
@@ -97,17 +105,26 @@ exports.addParticipant = async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
-
+    
+    // ⭐ ПРОВЕРЯЕМ, ЧТО ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ - АДМИН ГРУППЫ
     const chat = await Chat.findById(id);
     if (!chat) {
       return res.status(404).json({ error: 'Чат не найден' });
     }
-
+    
     if (!chat.isGroup) {
       return res.status(400).json({ error: 'Нельзя добавлять участников в личную переписку' });
     }
-
-    // ⭐ ПРОВЕРЯЕМ, ЧТО ДОБАВЛЯЕМЫЙ ПОЛЬЗОВАТЕЛЬ - ДРУГ
+    
+    // ⭐ ТОЛЬКО СОЗДАТЕЛЬ ГРУППЫ МОЖЕТ ДОБАВЛЯТЬ УЧАСТНИКОВ
+    if (chat.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ 
+        error: 'Только создатель группы может добавлять участников',
+        code: 'ONLY_GROUP_CREATOR'
+      });
+    }
+    
+    // Проверяем, что добавляемый пользователь - друг
     const currentUser = await User.findById(req.userId).populate('friends');
     const friendIds = currentUser.friends.map(f => f._id.toString());
     
@@ -117,20 +134,25 @@ exports.addParticipant = async (req, res) => {
         code: 'ONLY_FRIENDS_ALLOWED'
       });
     }
-
+    
+    // Проверяем, не добавлен ли уже пользователь
+    if (chat.participants.includes(userId)) {
+      return res.status(400).json({ error: 'Пользователь уже в группе' });
+    }
+    
     const updatedChat = await Chat.findByIdAndUpdate(
       id,
       { $addToSet: { participants: userId } },
       { new: true }
     ).populate('participants', 'username displayName avatarUrl isOnline bio');
-
+    
     const io = req.app.get('io');
     if (io) {
       const userToAdd = await User.findById(userId);
       io.to(id).emit('participantAdded', { chatId: id, newUser: userToAdd });
       io.to(userId.toString()).emit('newChatCreated', updatedChat);
     }
-
+    
     res.json(updatedChat);
   } catch (err) {
     console.error('Ошибка в addParticipant:', err);
