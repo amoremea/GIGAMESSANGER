@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+client-desktop/node_modules/
+client-web/node_modules/
+server/node_modules/
+
+# Build outputs
+dist/
+build/
+client-desktop/dist/
+client-desktop/win-unpacked/
+*.exe
+*.dmg
+*.AppImage
+*.deb
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
