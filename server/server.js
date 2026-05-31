@@ -39,7 +39,7 @@ app.use((req, res, next) => {
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://gmessanger.onrender.com',
+  'https://gigamessanger.onrender.com',
   'file://'
 ];
 
