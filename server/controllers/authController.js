@@ -33,14 +33,13 @@ const register = async (req, res) => {
       username, 
       email, 
       passwordHash: hash,
-      verificationCode: code,
-      // ⭐ НЕ УСТАНАВЛИВАЕМ isVerified: true - пусть будет false по умолчанию
+      // verificationCode: code,
+      isVerified: true
     });
 
     await newUser.save();
 
-    // ОТПРАВКА БЕЗ AWAIT (Фоновый режим)
-    sendVerificationCode(email, code);
+    // sendVerificationCode(email, code);
 
     res.json({ 
       message: 'Регистрация успешна! Проверьте почту для подтверждения',

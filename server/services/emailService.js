@@ -18,7 +18,7 @@ transporter.verify((error) => {
 
 const sendVerificationCode = async (email, code) => {
   const mailOptions = {
-    from: `"GigaMessage" <${process.env.EMAIL_USER}>`, // ⭐ ИСПРАВЛЕНО: EMAIL_USER вместо GMAIL_USER
+    from: `"GigaMessage" <${process.env.EMAIL_USER}>`, 
     to: email.trim(),
     subject: 'Код подтверждения GigaMessage',
     html: `<strong>Ваш код: ${code}</strong>`,
