@@ -1,9 +1,9 @@
-// contexts/AuthContext.js - обновите функции
+// contexts/AuthContext.js - УБИРАЕМ console.log
 import React, { createContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { authService } from '../services/authService';
 import socketService from '../services/socketService';
-import toast from 'react-hot-toast'; // ДОБАВЬТЕ
+import toast from 'react-hot-toast';
 
 export const AuthContext = createContext();
 
@@ -14,24 +14,45 @@ export const AuthProvider = ({ children }) => {
   const [step, setStep] = useState('login');
   const [email, setEmail] = useState('');
 
+  const isTokenExpired = (token) => {
+    if (!token) return true;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.exp * 1000 < Date.now();
+    } catch {
+      return true;
+    }
+  };
+
   useEffect(() => {
-    if (token) {
+    if (token && !isTokenExpired(token)) {
       try {
         const decoded = jwtDecode(token);
         setUser(decoded);
         if (!socketService.socket || !socketService.socket.connected) {
-          console.log('🔌 Подключаем сокет...');
           socketService.connect(token);
         }
       } catch (e) {
-        console.error('Ошибка токена:', e);
         logout();
       }
+    } else if (token && isTokenExpired(token)) {
+      logout();
+      toast.error('Сессия истекла. Пожалуйста, войдите заново');
     } else {
       setUser(null);
       socketService.disconnect();
     }
   }, [token]);
+
+  useEffect(() => {
+    const handleAuthError = () => {
+      logout();
+      toast.error('Ваша сессия истекла. Пожалуйста, войдите заново');
+    };
+    
+    window.addEventListener('authError', handleAuthError);
+    return () => window.removeEventListener('authError', handleAuthError);
+  }, []);
 
   const login = async (credentials) => {
     try {
@@ -47,9 +68,13 @@ export const AuthProvider = ({ children }) => {
         toast.info('Требуется подтверждение email');
         return { success: false, requiresVerification: true };
       }
-      const errorMsg = err.response?.data?.error || 'Ошибка входа';
-      toast.error(errorMsg);
-      return { success: false, error: errorMsg };
+      if (err.response?.status === 429) {
+        toast.error('Слишком много попыток входа. Попробуйте через 2 минуты');
+      } else {
+        const errorMsg = err.response?.data?.error || 'Ошибка входа';
+        toast.error(errorMsg);
+      }
+      return { success: false, error: err.response?.data?.error };
     }
   };
 
@@ -100,7 +125,6 @@ export const AuthProvider = ({ children }) => {
     socketService.disconnect();
     setStep('login');
     setEmail('');
-    toast.success('Вы вышли из аккаунта');
   };
 
   const updateUserProfile = async (profileData) => {

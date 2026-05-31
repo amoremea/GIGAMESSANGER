@@ -1,9 +1,5 @@
+// services/emailService.js - ИСПРАВЛЕННЫЙ
 const nodemailer = require('nodemailer');
-
-console.log('Проверка переменных:', {
-  user: process.env.EMAIL_USER ? 'OK' : 'MISSING',
-  pass: process.env.EMAIL_PASS ? 'OK' : 'MISSING'
-});
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -15,30 +11,27 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Проверка соединения один раз при запуске
 transporter.verify((error) => {
-  if (error) console.log('❌ Ошибка почты:', error);
-  else console.log('📧 Почтовый сервер готов');
+  if (error) console.log('❌ Email error:', error.message);
+  else console.log('📧 Email ready');
 });
 
 const sendVerificationCode = async (email, code) => {
   const mailOptions = {
-    from: `"GigaMessage" <${process.env.GMAIL_USER}>`,
+    from: `"GigaMessage" <${process.env.EMAIL_USER}>`, // ⭐ ИСПРАВЛЕНО: EMAIL_USER вместо GMAIL_USER
     to: email.trim(),
     subject: 'Код подтверждения GigaMessage',
     html: `<strong>Ваш код: ${code}</strong>`,
   };
 
   try {
-    // Мы всё еще используем await здесь, чтобы поймать ошибку в логах
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Письмо отправлено на ${email}`);
   } catch (err) {
-    console.error('❌ Ошибка Gmail:', err);
+    console.error('❌ Email send error:', err.message);
   }
 };
 
 module.exports = { 
   sendVerificationCode, 
-  sendResendCode: sendVerificationCode // Обязательно дай это имя!
+  sendResendCode: sendVerificationCode
 };

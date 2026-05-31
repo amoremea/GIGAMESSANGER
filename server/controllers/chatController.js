@@ -1,4 +1,4 @@
-// controllers/chatController.js - убираем sendMessage отсюда полностью
+// controllers/chatController.js - ДОБАВЛЯЕМ ПРОВЕРКУ ДРУЗЕЙ
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const User = require('../models/User');
@@ -13,19 +13,13 @@ exports.getChats = async (req, res) => {
       .populate('lastMessage.sender', 'username displayName avatarUrl')
       .sort({ updatedAt: -1 });
     
-    // Нормализуем unreadCount для каждого чата
     const normalizedChats = chats.map(chat => {
-      // Преобразуем Map в объект для клиента
       let unreadCount = {};
       if (chat.unreadCount && chat.unreadCount instanceof Map) {
         unreadCount = Object.fromEntries(chat.unreadCount);
       } else if (chat.unreadCount && typeof chat.unreadCount === 'object') {
         unreadCount = chat.unreadCount;
       }
-      
-      // Логируем для отладки
-      const userUnread = unreadCount[userId] || 0;
-      console.log(`  Чат ${chat._id}: unread для ${userId} = ${userUnread}`);
       
       return {
         ...chat.toObject(),
@@ -44,6 +38,24 @@ exports.getChats = async (req, res) => {
 exports.createChat = async (req, res) => {
   try {
     const { participants, isGroup, name } = req.body;
+    
+    const currentUser = await User.findById(req.userId).populate('friends');
+    
+    if (isGroup && participants && participants.length > 0) {
+      // ⭐ ПРОВЕРЯЕМ, ЧТО ВСЕ УЧАСТНИКИ - ДРУЗЬЯ
+      const friendIds = currentUser.friends.map(f => f._id.toString());
+      
+      for (const participantId of participants) {
+        if (participantId.toString() !== req.userId.toString()) {
+          if (!friendIds.includes(participantId.toString())) {
+            return res.status(403).json({ 
+              error: 'Вы можете добавлять в группы только друзей',
+              code: 'ONLY_FRIENDS_ALLOWED'
+            });
+          }
+        }
+      }
+    }
 
     let allParticipants = participants || [];
     if (!allParticipants.includes(req.userId)) {
@@ -95,6 +107,17 @@ exports.addParticipant = async (req, res) => {
       return res.status(400).json({ error: 'Нельзя добавлять участников в личную переписку' });
     }
 
+    // ⭐ ПРОВЕРЯЕМ, ЧТО ДОБАВЛЯЕМЫЙ ПОЛЬЗОВАТЕЛЬ - ДРУГ
+    const currentUser = await User.findById(req.userId).populate('friends');
+    const friendIds = currentUser.friends.map(f => f._id.toString());
+    
+    if (!friendIds.includes(userId.toString())) {
+      return res.status(403).json({ 
+        error: 'Вы можете добавлять в группы только друзей',
+        code: 'ONLY_FRIENDS_ALLOWED'
+      });
+    }
+
     const updatedChat = await Chat.findByIdAndUpdate(
       id,
       { $addToSet: { participants: userId } },
@@ -133,14 +156,8 @@ exports.markAsRead = async (req, res) => {
       chat.unreadCount = new Map();
     }
     
-    // ⭐ Убеждаемся что устанавливаем 0
     chat.unreadCount.set(userId, 0);
-    
     await chat.save();
-    
-    // ⭐ Проверяем что сохранилось
-    const savedChat = await Chat.findById(chatId);
-    console.log(`✅ markAsRead: unreadCount для ${userId} = ${savedChat.unreadCount.get(userId)}`);
     
     res.json({ success: true });
   } catch (err) {

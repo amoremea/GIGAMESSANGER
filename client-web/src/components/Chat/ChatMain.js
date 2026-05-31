@@ -1,9 +1,10 @@
-// components/Chat/ChatMain.js
+// components/Chat/ChatMain.js - ОБНОВЛЕННАЯ ВЕРСИЯ С СЧЕТЧИКОМ
 import React, { useRef, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../Common/Avatar';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const MAX_MESSAGE_LENGTH = 1500;
 
 export const ChatMain = ({ 
   currentChat, 
@@ -14,12 +15,13 @@ export const ChatMain = ({
   onOpenGroupInfo,
   isMobile,
   onBack,
-  onMenuOpen  // ДОБАВЬТЕ ЭТУ СТРОКУ
+  onMenuOpen
 }) => {
   const { user } = useAuth();
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState('');
+  const [charCount, setCharCount] = useState(0);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -32,6 +34,12 @@ export const ChatMain = ({
       inputRef.current.focus();
     }
   }, [currentChat, isMobile]);
+
+  const handleTextChange = (e) => {
+    const newText = e.target.value;
+    setText(newText);
+    setCharCount(newText.length);
+  };
 
   const currentChatData = chats?.find(c => c._id === currentChat);
   const isGroup = currentChatData?.isGroup;
@@ -61,9 +69,17 @@ export const ChatMain = ({
 
   const handleSend = async (e) => {
     e.preventDefault();
+    
+    // ⭐ ВАЛИДАЦИЯ ДЛИНЫ
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      alert(`Сообщение не может превышать ${MAX_MESSAGE_LENGTH} символов`);
+      return;
+    }
+    
     if (!text.trim() && !file) return;
     await onSendMessage(text, file);
     setText('');
+    setCharCount(0);
     setFile(null);
     setFileName('');
     e.target.reset();
@@ -74,6 +90,9 @@ export const ChatMain = ({
     if (url.startsWith('http')) return url;
     return `${API}${url.startsWith('/') ? '' : '/'}${url}`;
   };
+
+  const isOverLimit = charCount > MAX_MESSAGE_LENGTH;
+  const isSendDisabled = (!text.trim() && !file) || isOverLimit;
 
   // Если чат не выбран
   if (!currentChat) {
@@ -190,7 +209,7 @@ export const ChatMain = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Форма ввода */}
+      {/* Форма ввода с счетчиком символов */}
       <form className="message-input-form" onSubmit={handleSend}>
         {file && (
           <div className="file-preview">
@@ -208,18 +227,31 @@ export const ChatMain = ({
             <input type="file" onChange={handleFileChange} />
           </label>
           
-          <input
-            ref={inputRef}
-            className="message-input"
-            placeholder="Напишите сообщение..."
-            value={text}
-            onChange={e => setText(e.target.value)}
-          />
+          <div style={{ flex: 1 }}>
+            <input
+              ref={inputRef}
+              className={`message-input ${isOverLimit ? 'is-invalid' : ''}`}
+              placeholder="Напишите сообщение..."
+              value={text}
+              onChange={handleTextChange}
+            />
+            {/* ⭐ СЧЕТЧИК СИМВОЛОВ */}
+            <div className="d-flex justify-content-between align-items-center mt-1 px-2">
+              <small className={`${isOverLimit ? 'text-danger' : 'text-muted'}`}>
+                {charCount} / {MAX_MESSAGE_LENGTH}
+              </small>
+              {isOverLimit && (
+                <small className="text-danger">
+                  <i className="bi bi-exclamation-triangle"></i> Превышен лимит
+                </small>
+              )}
+            </div>
+          </div>
           
           <button 
             className="send-button" 
             type="submit" 
-            disabled={!text.trim() && !file}
+            disabled={isSendDisabled}
           >
             <i className="bi bi-send-fill"></i>
           </button>

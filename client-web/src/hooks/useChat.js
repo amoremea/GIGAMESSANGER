@@ -1,4 +1,4 @@
-// hooks/useChat.js - ПОЛНОСТЬЮ ПЕРЕПИСАН (БЕЗ LOCALSTORAGE)
+// hooks/useChat.js - УБИРАЕМ console.log
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { chatService } from '../services/chatService';
 import { useAuth } from './useAuth';
@@ -11,18 +11,16 @@ export const useChat = () => {
   const [currentChat, setCurrentChat] = useState(null);
   const messagesRef = useRef([]);
 
-  // Загрузка чатов - просто берем данные с сервера
   const loadChats = useCallback(async () => {
     if (!token) return;
     try {
       const res = await chatService.getChats();
       setChats(res.data);
     } catch (err) {
-      console.error('Ошибка загрузки чатов:', err);
+      // Silent error
     }
   }, [token]);
 
-  // Загрузка сообщений
   const loadMessages = useCallback(async (chatId) => {
     if (!chatId) return;
     try {
@@ -30,11 +28,10 @@ export const useChat = () => {
       setMessages(res.data);
       messagesRef.current = res.data;
     } catch (err) {
-      console.error('Ошибка загрузки сообщений:', err);
+      // Silent error
     }
   }, []);
 
-  // Открыть чат
   const openChat = useCallback(async (chatId) => {
     if (currentChat === chatId) return;
     
@@ -42,14 +39,12 @@ export const useChat = () => {
     socketService.joinChat(chatId);
     await loadMessages(chatId);
     
-    // Обнуляем счетчик на сервере
     try {
       await chatService.markAsRead(chatId);
     } catch (err) {
-      console.error('Ошибка отметки прочитанных:', err);
+      // Silent error
     }
     
-    // Обнуляем локальный счетчик
     setChats(prev => prev.map(chat => {
       if (chat._id === chatId) {
         const newUnreadCount = { ...(chat.unreadCount || {}) };
@@ -60,7 +55,6 @@ export const useChat = () => {
     }));
   }, [currentChat, loadMessages, user]);
 
-  // Отправить сообщение
   const sendMessage = useCallback(async (text, file) => {
     if ((!text || !text.trim()) && !file) return false;
     if (!currentChat) return false;
@@ -74,7 +68,6 @@ export const useChat = () => {
         const res = await chatService.uploadFile(formData);
         fileUrl = res.data.fileUrl;
       } catch (err) {
-        console.error('Ошибка загрузки файла:', err);
         return false;
       }
     }
@@ -83,7 +76,6 @@ export const useChat = () => {
     return true;
   }, [currentChat]);
 
-  // Создать чат
   const createChat = useCallback(async (participants, isGroup = false, name = '') => {
     try {
       const res = await chatService.createChat({ participants, isGroup, name });
@@ -92,21 +84,16 @@ export const useChat = () => {
       await openChat(newChat._id);
       return newChat;
     } catch (err) {
-      console.error('Ошибка создания чата:', err);
       throw err;
     }
   }, [openChat]);
 
-  // Обработчик нового сообщения
   useEffect(() => {
     if (!token) return;
 
     socketService.connect(token);
 
     const handleNewMessage = (message) => {
-      console.log('📨 Новое сообщение:', message);
-      
-      // Добавляем в список сообщений если чат открыт
       if (message.chatId === currentChat) {
         setMessages(prev => {
           if (prev.some(m => m._id === message._id)) return prev;
@@ -114,17 +101,14 @@ export const useChat = () => {
         });
       }
       
-      // Обновляем список чатов
       setChats(prev => prev.map(chat => {
         if (chat._id === message.chatId) {
           let newUnreadCount = { ...(chat.unreadCount || {}) };
           
-          // Увеличиваем счетчик только если чат не открыт и сообщение не от меня
           if (message.chatId !== currentChat && message.sender?._id !== user?.userId) {
             const currentCount = newUnreadCount[user?.userId] || 0;
             newUnreadCount[user?.userId] = currentCount + 1;
           } else {
-            // Если чат открыт или сообщение от меня, счетчик 0
             newUnreadCount[user?.userId] = 0;
           }
           

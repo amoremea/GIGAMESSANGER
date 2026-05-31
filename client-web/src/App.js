@@ -1,4 +1,4 @@
-// App.js
+// App.js - С ОБРАБОТЧИКОМ authError
 import React from 'react';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
@@ -11,7 +11,17 @@ import { useEffect } from 'react';
 import './App.css';
 
 const AppContent = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+
+  // ⭐ ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК АУТЕНТИФИКАЦИИ
+  useEffect(() => {
+    const handleAuthError = () => {
+      logout();
+    };
+    
+    window.addEventListener('authError', handleAuthError);
+    return () => window.removeEventListener('authError', handleAuthError);
+  }, [logout]);
 
   if (!token) {
     return <AuthLayout />;

@@ -1,4 +1,3 @@
-// server.js - исправленная версия
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
@@ -24,11 +23,9 @@ const friendRoutes = require('./routes/friendRoutes');
 const app = express();
 const server = http.createServer(app);
 
-// ⭐ ВАЖНО: Инициализируем socket ПРАВИЛЬНО
 const io = initSocket(server);
 setupSocketHandlers(io);
 
-// Сохраняем io в app для доступа в контроллерах
 app.set('io', io);
 
 if (!fs.existsSync('uploads')) {
@@ -51,7 +48,6 @@ app.use(cors({
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('CORS заблокировал origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -63,10 +59,13 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 connectDB();
 
-app.use((req, res, next) => {
-  console.log(`📡 [${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
+// ⭐ ТОЛЬКО КРИТИЧЕСКИЕ ЛОГИ (можно закомментировать если не нужно)
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`📡 ${req.method} ${req.url}`);
+    next();
+  });
+}
 
 app.use('/api', authRoutes); 
 app.use('/api', userRoutes);

@@ -1,4 +1,4 @@
-// services/socketService.js
+// services/socketService.js - БЕЗ ЛИШНИХ ЛОГОВ
 import io from 'socket.io-client';
 import { SOCKET_URL } from './api';
 
@@ -12,7 +12,6 @@ class SocketService {
 
   connect(token) {
     if (this.socket && this.socket.connected) {
-      console.log('✅ Socket уже подключен');
       return this.socket;
     }
 
@@ -20,13 +19,10 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
     }
-
-    console.log('🔄 Создаем новое socket соединение...');
-    console.log('🔌 SOCKET_URL:', SOCKET_URL);
     
     this.socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
@@ -34,17 +30,14 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket connected, ID:', this.socket.id);
       this.isConnected = true;
     });
 
-    this.socket.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected, reason:', reason);
+    this.socket.on('disconnect', () => {
       this.isConnected = false;
     });
 
-    this.socket.on('connect_error', (err) => {
-      console.error('Socket error:', err.message);
+    this.socket.on('connect_error', () => {
       this.isConnected = false;
     });
 
@@ -52,10 +45,7 @@ class SocketService {
   }
 
   on(event, callback) {
-    if (!this.socket) {
-      console.warn(`⚠️ Нет сокета, не могу подписаться на ${event}`);
-      return;
-    }
+    if (!this.socket) return;
     
     if (this.eventListeners.has(event)) {
       this.socket.off(event);
@@ -77,8 +67,6 @@ class SocketService {
   emit(event, data) {
     if (this.socket && this.isConnected) {
       this.socket.emit(event, data);
-    } else {
-      console.warn(`⚠️ Socket not connected, cannot emit: ${event}`);
     }
   }
 
@@ -95,7 +83,6 @@ class SocketService {
   }
 
   sendFriendRequest(targetUserId) {
-    console.log(`📡 Отправляем заявку через сокет для ${targetUserId}`);
     this.emit('send_friend_request', { targetUserId });
   }
 

@@ -1,16 +1,16 @@
-// components/Modals/GroupModal.js
+// components/Modals/GroupModal.js - ТОЛЬКО ДРУЗЬЯ
 import React, { useState } from 'react';
 import { Avatar } from '../Common/Avatar';
 import { useFriends } from '../../hooks/useFriends';
 import { useChat } from '../../hooks/useChat';
 import { useAuth } from '../../hooks/useAuth';
-import { useNotification } from '../../contexts/NotificationContext'; // ДОБАВЬТЕ
+import { useNotification } from '../../contexts/NotificationContext';
 
 export const GroupModal = ({ onClose }) => {
   const { user } = useAuth();
   const { friends } = useFriends();
   const { createChat } = useChat();
-  const { showError, showSuccess } = useNotification(); // ДОБАВЬТЕ
+  const { showError, showSuccess } = useNotification();
   const [groupName, setGroupName] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
  
@@ -35,7 +35,11 @@ export const GroupModal = ({ onClose }) => {
       onClose();
     } catch (error) {
       console.error("Ошибка при создании группы:", error);
-      showError('Ошибка при создании группы');
+      if (error.response?.data?.code === 'ONLY_FRIENDS_ALLOWED') {
+        showError('Вы можете добавлять в группы только друзей');
+      } else {
+        showError('Ошибка при создании группы');
+      }
     }
   };
 
@@ -62,7 +66,7 @@ export const GroupModal = ({ onClose }) => {
           </div>
 
           <div className="group-members-label">
-            <label>Выберите участников</label>
+            <label>Выберите участников (только друзья)</label>
             <span>{selectedUsers.length} выбрано</span>
           </div>
           

@@ -1,5 +1,6 @@
-// config/socket.js - исправленная версия
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 const initSocket = (server) => {
   const io = new Server(server, {
@@ -10,15 +11,39 @@ const initSocket = (server) => {
       methods: ["GET", "POST"],
       credentials: true
     },
-    // ⭐ КРИТИЧЕСКИ ВАЖНЫЕ НАСТРОЙКИ ДЛЯ RENDER
     pingTimeout: 60000,
     pingInterval: 25000,
-    connectTimeout: 45000,
-    // ⭐ ТОЛЬКО WEBSOCKET, без polling (иначе проблемы на Render)
-    transports: ['websocket'],
+    transports: ['polling', 'websocket'],
     allowEIO3: true,
-    // ⭐ Добавляем path для совместимости
     path: '/socket.io/'
+  });
+
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth.token;
+      
+      if (!token) {
+        return next(new Error('No token provided'));
+      }
+      
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      if (!decoded || !decoded.userId) {
+        return next(new Error('Invalid token'));
+      }
+      
+      const user = await User.findById(decoded.userId);
+      
+      if (!user) {
+        return next(new Error('User not found'));
+      }
+      
+      socket.userId = decoded.userId;
+      socket.user = user;
+      next();
+    } catch (err) {
+      next(new Error('Unauthorized'));
+    }
   });
 
   return io;
