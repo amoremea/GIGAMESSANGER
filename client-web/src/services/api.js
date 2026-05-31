@@ -6,7 +6,7 @@ const isProduction = window.location.hostname !== 'localhost';
 
 // Базовый URL для запросов
 export const API_URL = isProduction 
-  ? 'https://gmessanger.onrender.com/api' 
+  ? 'https://gigamessanger.onrender.com/api' 
   : 'http://localhost:5000/api';
 
 // Псевдоним для старых компонентов
