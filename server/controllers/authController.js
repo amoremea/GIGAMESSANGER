@@ -36,14 +36,14 @@ const register = async (req, res) => {
   try {
     const { username, email, password, confirmPassword } = req.body;
     
-    // ⭐ ПРОВЕРКА CAPTCHA
-    if (!req.recaptcha || req.recaptcha.error) {
-      console.log('❌ CAPTCHA verification failed:', req.recaptcha?.error);
-      return res.status(400).json({ 
-        error: 'Пожалуйста, подтвердите, что вы не робот',
-        code: 'CAPTCHA_REQUIRED'
-      });
-    }
+    // // ⭐ ПРОВЕРКА CAPTCHA
+    // if (!req.recaptcha || req.recaptcha.error) {
+    //   console.log('❌ CAPTCHA verification failed:', req.recaptcha?.error);
+    //   return res.status(400).json({ 
+    //     error: 'Пожалуйста, подтвердите, что вы не робот',
+    //     code: 'CAPTCHA_REQUIRED'
+    //   });
+    // }
     
     // Проверка на существующего пользователя
     const existingUser = await User.findOne({ 
