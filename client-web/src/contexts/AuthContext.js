@@ -81,14 +81,31 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     setLoading(true);
     try {
+      console.log('📤 Register request with captcha:', !!userData['g-recaptcha-response']);
       const res = await authService.register(userData);
+      console.log('✅ Register success:', res.data);
       toast.success(res.data.message || 'Регистрация успешна! Проверьте почту для подтверждения');
       setStep('login');
       return { success: true };
     } catch (err) {
-      const errorMsg = err.response?.data?.error || 'Ошибка регистрации';
-      toast.error(errorMsg);
-      return { success: false, error: errorMsg };
+      console.log('❌ Register error FULL:', err);
+      console.log('❌ Register error response:', err.response);
+      console.log('❌ Register error data:', err.response?.data);
+      console.log('❌ Register error code:', err.response?.data?.code);
+      
+      // Показываем конкретную ошибку
+      const errorCode = err.response?.data?.code;
+      const errorMessage = err.response?.data?.error || 'Ошибка регистрации';
+      
+      if (errorCode === 'CAPTCHA_REQUIRED') {
+        toast.error('Пожалуйста, подтвердите, что вы не робот');
+      } else if (errorCode === 'CAPTCHA_INVALID') {
+        toast.error('Неверная капча. Попробуйте снова');
+      } else {
+        toast.error(errorMessage);
+      }
+      
+      return { success: false, error: errorMessage, code: errorCode };
     } finally {
       setLoading(false);
     }

@@ -35,6 +35,24 @@ const getProfile = async (req, res) => {
 const register = async (req, res) => {
   try {
     const { username, email, password, confirmPassword } = req.body;
+    
+    // ⭐ ПРОВЕРКА CAPTCHA
+    if (!req.recaptcha || req.recaptcha.error) {
+      console.log('❌ CAPTCHA verification failed:', req.recaptcha?.error);
+      return res.status(400).json({ 
+        error: 'Пожалуйста, подтвердите, что вы не робот',
+        code: 'CAPTCHA_REQUIRED'
+      });
+    }
+    
+    // Проверка на существующего пользователя
+    const existingUser = await User.findOne({ 
+      $or: [{ email }, { username }] 
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ error: 'Пользователь с таким email или именем уже существует' });
+    }
 
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({ error: 'Введите корректный адрес электронной почты' });
@@ -49,7 +67,7 @@ const register = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    // const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     const newUser = new User({ 
       username, 
@@ -60,8 +78,7 @@ const register = async (req, res) => {
     });
 
     await newUser.save();
-
-    // sendVerificationCode(email, code);
+    // await sendVerificationCode(email, code);
 
     res.json({ 
       message: 'Регистрация успешна! Проверьте почту для подтверждения',
@@ -71,7 +88,7 @@ const register = async (req, res) => {
     if (err.code === 11000) {
       return res.status(400).json({ error: 'Пользователь с такими данными уже существует' });
     }
-    console.error(err);
+    console.error('Registration error:', err);
     res.status(500).json({ error: 'Ошибка сервера при регистрации' });
   }
 };

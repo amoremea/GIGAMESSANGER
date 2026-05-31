@@ -79,8 +79,23 @@ const clearFailedAttempts = (email) => {
   failedAttempts.delete(`${key}:time`);
 };
 
+const registerRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 час
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { 
+    error: 'Слишком много попыток регистрации. Попробуйте позже',
+    code: 'TOO_MANY_REGISTRATION_ATTEMPTS'
+  },
+  keyGenerator: (req) => {
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+  }
+});
+
 module.exports = { 
   loginRateLimiter, 
+  registerRateLimiter,
   trackFailedAttempts, 
   recordFailedAttempt, 
   clearFailedAttempts 

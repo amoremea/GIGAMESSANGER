@@ -1,7 +1,12 @@
+// services/authService.js
 import api from './api';
 
 export const authService = {
-  register: (userData) => api.post('/register', userData),
+  register: (userData) => {
+    // ⭐ Убеждаемся, что CAPTCHA токен отправляется
+    console.log('📤 Registering with CAPTCHA');
+    return api.post('/register', userData);
+  },
   verify: (data) => api.post('/verify', data),
   login: (credentials) => api.post('/login', credentials),
   resendCode: (email) => api.post('/resend-code', { email }),

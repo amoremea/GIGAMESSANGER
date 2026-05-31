@@ -1,9 +1,9 @@
-// components/Auth/Register.js - С ПОЛНОЙ ВАЛИДАЦИЕЙ
+// components/Auth/Register.js
 import React, { useState } from 'react';
+import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../contexts/NotificationContext';
 
-// ⭐ РЕГУЛЯРНЫЕ ВЫРАЖЕНИЯ
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d).+$/;
 
@@ -14,12 +14,20 @@ export const Register = ({ onSwitchToLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
-  // ⭐ СОСТОЯНИЯ ДЛЯ ОШИБОК
+  const [captchaToken, setCaptchaToken] = useState(null);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  // ⭐ ФУНКЦИИ ВАЛИДАЦИИ
+  const handleCaptchaChange = (token) => {
+    console.log('CAPTCHA verified:', token);
+    setCaptchaToken(token);
+  };
+
+  const handleCaptchaExpired = () => {
+    console.log('CAPTCHA expired');
+    setCaptchaToken(null);
+  };
+
   const validateUsername = (value) => {
     if (!value) return 'Имя пользователя обязательно';
     if (value.length < 2) return 'Минимум 2 символа';
@@ -64,12 +72,18 @@ export const Register = ({ onSwitchToLogin }) => {
   };
 
   const handleChange = (field, value) => {
-    eval(`set${field.charAt(0).toUpperCase() + field.slice(1)}(value)`);
+    const setter = {
+      username: setUsername,
+      email: setEmail,
+      password: setPassword,
+      confirmPassword: setConfirmPassword
+    }[field];
+    setter(value);
+    
     if (touched[field]) {
       const error = validateField(field, value);
       setErrors({ ...errors, [field]: error });
     }
-    // При изменении пароля, проверяем confirmPassword
     if (field === 'password' && touched.confirmPassword) {
       const confirmError = validateConfirmPassword(confirmPassword);
       setErrors({ ...errors, confirmPassword: confirmError });
@@ -81,18 +95,23 @@ export const Register = ({ onSwitchToLogin }) => {
       validateUsername(username) === '' &&
       validateEmail(email) === '' &&
       validatePassword(password) === '' &&
-      validateConfirmPassword(confirmPassword) === ''
+      validateConfirmPassword(confirmPassword) === '' &&
+      captchaToken !== null
     );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Отмечаем все поля как touched
+
+    if (!captchaToken) {
+      console.log('❌ No captcha token!');
+      showError('Пожалуйста, подтвердите, что вы не робот');
+      return;
+    }
+
     const allTouched = { username: true, email: true, password: true, confirmPassword: true };
     setTouched(allTouched);
     
-    // Валидируем все поля
     const newErrors = {
       username: validateUsername(username),
       email: validateEmail(email),
@@ -101,18 +120,28 @@ export const Register = ({ onSwitchToLogin }) => {
     };
     setErrors(newErrors);
     
-    // Проверяем наличие ошибок
     if (Object.values(newErrors).some(error => error !== '')) {
       showError('Пожалуйста, исправьте ошибки в форме');
       return;
     }
 
-    const result = await register({ username, email, password, confirmPassword });
+    const result = await register({ 
+      username, 
+      email, 
+      password, 
+      confirmPassword,
+      'g-recaptcha-response': captchaToken 
+    });
+    
     if (result.success) {
       showSuccess('Регистрация успешна! Теперь войдите в аккаунт');
       setTimeout(() => onSwitchToLogin(), 2000);
     } else {
       showError(result.error || 'Ошибка регистрации');
+      setCaptchaToken(null);
+      if (window.grecaptcha) {
+        window.grecaptcha.reset();
+      }
     }
   };
 
@@ -184,6 +213,15 @@ export const Register = ({ onSwitchToLogin }) => {
             {touched.confirmPassword && errors.confirmPassword && (
               <div className="invalid-feedback d-block">{errors.confirmPassword}</div>
             )}
+          </div>
+
+          {/* ⭐ CAPTCHA */}
+          <div className="mb-3 d-flex justify-content-center">
+            <ReCAPTCHA
+              sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+              onChange={handleCaptchaChange}
+              onExpired={handleCaptchaExpired}
+            />
           </div>
         </div>
         

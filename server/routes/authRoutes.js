@@ -1,9 +1,14 @@
-// routes/authRoutes.js - С RATE LIMITER
+// routes/authRoutes.js
 const express = require('express');
 const auth = require('../middleware/auth');
 const upload = require('../services/uploadService');
 const validateRegistration = require('../middleware/validateRegistration');
-const { loginRateLimiter, trackFailedAttempts } = require('../middleware/rateLimiter');
+const { 
+  loginRateLimiter, 
+  registerRateLimiter,
+  trackFailedAttempts 
+} = require('../middleware/rateLimiter');
+const { verifyCaptcha } = require('../services/recaptchaService');
 const {
   register,
   verify,
@@ -15,9 +20,15 @@ const {
 
 const router = express.Router();
 
-router.post('/register', validateRegistration, register);
+// ⭐ РЕГИСТРАЦИЯ С CAPTCHA
+router.post('/register', 
+  registerRateLimiter,
+  verifyCaptcha,
+  validateRegistration, 
+  register
+);
+
 router.post('/verify', verify);
-// ⭐ ПРИМЕНЯЕМ RATE LIMITER ДЛЯ LOGIN
 router.post('/login', loginRateLimiter, trackFailedAttempts, login);
 router.post('/resend-code', resendCode);
 router.put('/profile', auth, updateProfile);
