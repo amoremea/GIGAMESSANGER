@@ -14,7 +14,7 @@ export const API = API_URL;
 
 // URL для сокетов (без /api)
 export const SOCKET_URL = isProduction 
-  ? 'https://gmessanger.onrender.com' 
+  ? 'https://gigamessanger.onrender.com' 
   : 'http://localhost:5000';
 
 const api = axios.create({
