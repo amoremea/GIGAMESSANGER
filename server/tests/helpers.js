@@ -4,13 +4,19 @@ const { app } = require('../server');
 const User = require('../models/User');
 
 const createUser = async (username, email, password) => {
-  // Регистрация
+  // Регистрация с моковым CAPTCHA токеном
   const registerRes = await request(app)
     .post('/api/register')
-    .send({ username, email, password, confirmPassword: password });
+    .send({ 
+      username, 
+      email, 
+      password, 
+      confirmPassword: password,
+      'g-recaptcha-response': 'mock-token-for-testing'
+    });
   
   if (registerRes.statusCode !== 200) {
-    throw new Error(`Registration failed: ${registerRes.statusCode}`);
+    throw new Error(`Registration failed: ${registerRes.statusCode} - ${JSON.stringify(registerRes.body)}`);
   }
   
   // Логин
@@ -19,7 +25,7 @@ const createUser = async (username, email, password) => {
     .send({ email, password });
   
   if (loginRes.statusCode !== 200) {
-    throw new Error(`Login failed: ${loginRes.statusCode}`);
+    throw new Error(`Login failed: ${loginRes.statusCode} - ${JSON.stringify(loginRes.body)}`);
   }
   
   const user = await User.findOne({ email });
